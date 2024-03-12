@@ -26,6 +26,7 @@ var (
 	}
 	config Config
 	wg     sync.WaitGroup
+	done   = make(chan struct{})
 )
 
 type Config struct {
@@ -135,8 +136,7 @@ func success() {
 		go sendText(number, config.SMSKey)
 	}
 
-	time.Sleep(5 * time.Second)
-	log.Fatal("Ending the process")
+	close(done)
 }
 
 func failure() {
@@ -166,16 +166,20 @@ func main() {
 	loadConfig()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		<-signals
-		fmt.Println("\nReceived an interrupt, stopping services...")
-		cancel()
-	}()
+	go scrapeLoop(ctx)
 
-	scrapeLoop(ctx)
+	select {
+	case <-signals:
+		fmt.Println("\nReceived an interrupt, stopping service...")
+	case <-done:
+		fmt.Println("\nSuccess! Terminating gracefully...")
+	}
+	cancel()
 
 	wg.Wait()
 	fmt.Println("Shutting down gracefully")
