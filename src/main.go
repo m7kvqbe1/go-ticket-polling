@@ -99,6 +99,7 @@ func sendText(number, key string) {
 
 func fetch(ctx context.Context) {
 	c := colly.NewCollector(
+		// Spoof user agent to avoid bot detection
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"),
 	)
 
