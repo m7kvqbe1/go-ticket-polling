@@ -1,0 +1,3 @@
+# Polling for da tikz...
+
+> Poll and scrape a supplied URI, send SMS when a ticket becomes available.
