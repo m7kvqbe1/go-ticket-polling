@@ -21,7 +21,7 @@ import (
 var (
 	httpClient = &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Ignore SSL errors
 		},
 	}
 	config Config
