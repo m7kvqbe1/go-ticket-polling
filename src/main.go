@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,16 @@ type Config struct {
 	IntervalMS   int      `json:"INTERVAL_MS"`
 }
 
+var client = &http.Client{
+	Timeout: time.Second * 30,
+	Transport: &http.Transport{
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: false}, // It's recommended to not disable SSL verification
+		MaxIdleConns:        10,
+		IdleConnTimeout:     30 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+	},
+}
+
 func loadConfig() Config {
 	var config Config
 	configFile, err := os.ReadFile("./config.json")
@@ -27,18 +38,16 @@ func loadConfig() Config {
 		log.Fatalf("Unable to read config file: %v", err)
 	}
 
-	json.Unmarshal(configFile, &config)
+	err = json.Unmarshal(configFile, &config)
+
+	if err != nil {
+		log.Fatalf("Unable to parse config file: %v", err)
+	}
 
 	return config
 }
 
 func sendText(number string, key string) {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Disable SSL verification
-		},
-	}
-
 	message := `BUY DI TIKITZ!!!`
 	reqBody := strings.NewReader(fmt.Sprintf(`{"phone": "%s", "message": "%s", "key": "%s"}`, number, message, key))
 
@@ -69,6 +78,7 @@ func sendText(number string, key string) {
 
 func parsePage(html string, config Config) {
 	match := `<a id="buynow" href="#" title="Buy tickets">Buy tickets</a>`
+
 	if strings.Contains(html, match) {
 		success(config)
 	} else {
@@ -79,11 +89,17 @@ func parsePage(html string, config Config) {
 func success(config Config) {
 	fmt.Println("BUY DI TIKITZ!!!")
 
+	var wg sync.WaitGroup
+
 	for _, number := range config.PhoneNumbers {
-		go sendText(number, config.SMSKey)
+		wg.Add(1)
+		go func(num string) {
+			defer wg.Done()
+			sendText(num, config.SMSKey)
+		}(number)
 	}
 
-	time.Sleep(5 * time.Second)
+	wg.Wait() // Wait for all SMS sending goroutines to finish
 	log.Fatal("Ending the process.")
 }
 
@@ -92,7 +108,7 @@ func failure() {
 }
 
 func fetch(config Config) {
-	resp, err := http.Get(config.URI)
+	resp, err := client.Get(config.URI)
 
 	if err != nil {
 		log.Println(err)
