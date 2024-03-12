@@ -20,29 +20,23 @@ type Config struct {
 	IntervalMS   int      `json:"INTERVAL_MS"`
 }
 
-var (
-	httpClient = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-)
+var config Config
 
-func loadConfig() Config {
-	var config Config
+var httpClient = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
+}
+
+func loadConfig() {
 	configFile, err := os.ReadFile("./config.json")
-
 	if err != nil {
 		log.Fatalf("Unable to read config file: %v", err)
 	}
-
 	err = json.Unmarshal(configFile, &config)
-
 	if err != nil {
 		log.Fatalf("Unable to parse config file: %v", err)
 	}
-
-	return config
 }
 
 func sendText(number, key string) {
@@ -50,7 +44,6 @@ func sendText(number, key string) {
 	reqBody := strings.NewReader(fmt.Sprintf(`{"phone": "%s", "message": "%s", "key": "%s"}`, number, message, key))
 
 	req, err := http.NewRequest("POST", "https://textbelt.com/text", reqBody)
-
 	if err != nil {
 		log.Println("Error creating request:", err)
 		return
@@ -59,12 +52,10 @@ func sendText(number, key string) {
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := httpClient.Do(req)
-
 	if err != nil {
 		log.Println("Error sending SMS:", err)
 		return
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
@@ -74,7 +65,7 @@ func sendText(number, key string) {
 	}
 }
 
-func fetch(config Config) {
+func fetch() {
 	c := colly.NewCollector(
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
 	)
@@ -90,7 +81,7 @@ func fetch(config Config) {
 
 	c.OnHTML("a[id='buynow']", func(e *colly.HTMLElement) {
 		foundBuynow = true
-		success(config)
+		success()
 	})
 
 	c.OnScraped(func(r *colly.Response) {
@@ -109,7 +100,7 @@ func fetch(config Config) {
 	}
 }
 
-func success(config Config) {
+func success() {
 	fmt.Println("BUY DI TIKITZ!!!")
 
 	for _, number := range config.PhoneNumbers {
@@ -124,17 +115,17 @@ func failure() {
 	fmt.Println("no tikz found...")
 }
 
-func scrapeLoop(config Config) {
+func scrapeLoop() {
 	ticker := time.NewTicker(time.Duration(config.IntervalMS) * time.Millisecond)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		fetch(config)
+		fetch()
 	}
 }
 
 func main() {
 	fmt.Println("Polling for da tikz...")
-	config := loadConfig()
-	scrapeLoop(config)
+	loadConfig()
+	scrapeLoop()
 }
