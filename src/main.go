@@ -195,11 +195,10 @@ func main() {
 
 	select {
 	case <-signals:
-		log.Println("\nReceived an interrupt, stopping service...")
+		log.Println("Received an interrupt, stopping service...")
 	case <-done:
-		log.Println("\nSuccess! Terminating gracefully...")
+		log.Println("Success! Terminating gracefully...")
 	}
-	cancel()
 
 	wg.Wait()
 	log.Println("Shutting down gracefully")
