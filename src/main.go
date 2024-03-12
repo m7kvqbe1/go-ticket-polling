@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -52,10 +51,30 @@ func sendText(number, key string) {
 	wg.Add(1)
 	defer wg.Done()
 
-	message := `BUY DI TIKITZ!!!`
-	reqBody := strings.NewReader(fmt.Sprintf(`{"phone": "%s", "message": "%s", "key": "%s"}`, number, message, key))
+	type RequestBody struct {
+		Phone   string `json:"phone"`
+		Message string `json:"message"`
+		Key     string `json:"key"`
+	}
 
-	req, err := http.NewRequest("POST", "https://textbelt.com/text", reqBody)
+	reqBody := &RequestBody{
+		Phone:   number,
+		Message: "BUY DI TIKITZ!!!",
+		Key:     key,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		log.Println("Error encoding request body:", err)
+		return
+	}
+
+	req, err := http.NewRequest(
+		"POST",
+		"https://textbelt.com/text",
+		strings.NewReader(string(reqJSON)),
+	)
+
 	if err != nil {
 		log.Println("Error creating request:", err)
 		return
@@ -80,7 +99,7 @@ func sendText(number, key string) {
 
 func fetch(ctx context.Context) {
 	c := colly.NewCollector(
-		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"),
 	)
 
 	c.WithTransport(&http.Transport{
@@ -91,7 +110,7 @@ func fetch(ctx context.Context) {
 	})
 
 	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
+		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9")
 		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
 		r.Headers.Set("Referer", "https://www.google.com/")
 		log.Println("Visiting", r.URL.String())
