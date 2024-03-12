@@ -75,7 +75,17 @@ func sendText(number, key string) {
 }
 
 func fetch(config Config) {
-	c := colly.NewCollector()
+	c := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
+	)
+
+	c.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
+		r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
+		r.Headers.Set("Referer", "https://www.google.com/")
+		log.Println("Visiting", r.URL.String())
+	})
+
 	foundBuynow := false
 
 	c.OnHTML("a[id='buynow']", func(e *colly.HTMLElement) {
@@ -94,7 +104,6 @@ func fetch(config Config) {
 	})
 
 	err := c.Visit(config.URL)
-
 	if err != nil {
 		log.Println("Error visiting:", err)
 	}
@@ -108,7 +117,7 @@ func success(config Config) {
 	}
 
 	time.Sleep(5 * time.Second)
-	log.Fatal("Ending the process.")
+	log.Fatal("Ending the process")
 }
 
 func failure() {
