@@ -1,17 +1,13 @@
-FROM golang:latest
+FROM golang:1.22.1
 
 LABEL maintainer="Tom Humphris <tom@muska.co.uk>"
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY . .
 
 RUN go mod download
 
-COPY . .
-
-RUN go build -o main .
-
-EXPOSE 8080
+RUN go build -o main ./src
 
 CMD ["./main"]
