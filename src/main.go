@@ -72,7 +72,7 @@ func sendText(number, key string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		fmt.Printf("SMS sent: %s\n", number)
+		log.Printf("SMS sent: %s\n", number)
 	} else {
 		log.Printf("Failed to send SMS to %s\n", number)
 	}
@@ -130,7 +130,7 @@ func fetch(ctx context.Context) {
 }
 
 func success() {
-	fmt.Println("BUY DI TIKITZ!!!")
+	log.Println("BUY DI TIKITZ!!!")
 
 	for _, number := range config.PhoneNumbers {
 		go sendText(number, config.SMSKey)
@@ -140,7 +140,7 @@ func success() {
 }
 
 func failure() {
-	fmt.Println("no tikz found...")
+	log.Println("no tikz found...")
 }
 
 func scrapeLoop(ctx context.Context) {
@@ -162,7 +162,7 @@ func scrapeLoop(ctx context.Context) {
 }
 
 func main() {
-	fmt.Println("Polling for da tikz...")
+	log.Println("Polling for da tikz...")
 	loadConfig()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -175,12 +175,12 @@ func main() {
 
 	select {
 	case <-signals:
-		fmt.Println("\nReceived an interrupt, stopping service...")
+		log.Println("\nReceived an interrupt, stopping service...")
 	case <-done:
-		fmt.Println("\nSuccess! Terminating gracefully...")
+		log.Println("\nSuccess! Terminating gracefully...")
 	}
 	cancel()
 
 	wg.Wait()
-	fmt.Println("Shutting down gracefully")
+	log.Println("Shutting down gracefully")
 }
