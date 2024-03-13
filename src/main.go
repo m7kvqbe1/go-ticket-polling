@@ -47,7 +47,7 @@ func loadConfig() {
 	}
 }
 
-func sendText(number, key string) {
+func sendText(number string, key string) {
 	wg.Add(1)
 	defer wg.Done()
 
