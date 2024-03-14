@@ -51,19 +51,15 @@ func sendText(number string, key string) {
 	wg.Add(1)
 	defer wg.Done()
 
-	type RequestBody struct {
+	reqJSON, err := json.Marshal(&struct {
 		Phone   string `json:"phone"`
 		Message string `json:"message"`
 		Key     string `json:"key"`
-	}
-
-	reqBody := &RequestBody{
+	}{
 		Phone:   number,
 		Message: "BUY DI TIKITZ!!!",
 		Key:     key,
-	}
-
-	reqJSON, err := json.Marshal(reqBody)
+	})
 	if err != nil {
 		log.Println("Error encoding request body:", err)
 		return
