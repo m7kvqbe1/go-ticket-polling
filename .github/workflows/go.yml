@@ -19,4 +19,4 @@ jobs:
         run: go mod download
 
       - name: Build
-        run: go build -v -o go-ticket-polling ./src
+        run: go build -v -o go-ticket-polling ./
