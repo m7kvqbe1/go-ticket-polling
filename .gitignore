@@ -1,6 +1,7 @@
 /vendor
 /bin
 /pkg
+/tmp
 *.log
 .DS_Store
 .env
