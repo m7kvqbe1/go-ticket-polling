@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gocolly/colly/v2"
+	"github.com/joho/godotenv"
 )
 
 var (
@@ -23,42 +25,27 @@ var (
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Ignore SSL errors
 		},
 	}
-	config Config
-	wg     sync.WaitGroup
-	done   = make(chan struct{})
+	wg   sync.WaitGroup
+	done = make(chan struct{})
 )
 
-type Config struct {
-	URL          string   `json:"URL"`
-	SMSKey       string   `json:"SMS_KEY"`
-	PhoneNumbers []string `json:"PHONE_NUMBERS"`
-	IntervalMS   int      `json:"INTERVAL_MS"`
-}
-
-func loadConfig() {
-	configFile, err := os.ReadFile("./config.json")
-	if err != nil {
-		log.Fatalf("Unable to read config file: %v", err)
-	}
-
-	err = json.Unmarshal(configFile, &config)
-	if err != nil {
-		log.Fatalf("Unable to parse config file: %v", err)
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 }
 
-func sendText(number string, key string) {
+func sendText(number string) {
 	wg.Add(1)
 	defer wg.Done()
 
-	reqJSON, err := json.Marshal(&struct {
-		Phone   string `json:"phone"`
-		Message string `json:"message"`
-		Key     string `json:"key"`
-	}{
-		Phone:   number,
-		Message: "BUY DI TIKITZ!!!",
-		Key:     key,
+	key := os.Getenv("SMS_KEY")
+	message := "BUY DI TIKITZ!!!"
+
+	reqJSON, err := json.Marshal(map[string]string{
+		"phone":   number,
+		"message": message,
+		"key":     key,
 	})
 	if err != nil {
 		log.Println("Error encoding request body:", err)
@@ -70,7 +57,6 @@ func sendText(number string, key string) {
 		"https://textbelt.com/text",
 		strings.NewReader(string(reqJSON)),
 	)
-
 	if err != nil {
 		log.Println("Error creating request:", err)
 		return
@@ -135,7 +121,7 @@ func fetch(ctx context.Context) {
 		return
 	}
 
-	err := c.Visit(config.URL)
+	err := c.Visit(os.Getenv("URL"))
 	if err != nil {
 		log.Println("Error visiting:", err)
 	}
@@ -148,8 +134,9 @@ func fetch(ctx context.Context) {
 func success() {
 	log.Println("BUY DI TIKITZ!!!")
 
-	for _, number := range config.PhoneNumbers {
-		go sendText(number, config.SMSKey)
+	phoneNumbers := strings.Split(os.Getenv("PHONE_NUMBERS"), ",")
+	for _, number := range phoneNumbers {
+		go sendText(number)
 	}
 
 	close(done)
@@ -160,7 +147,12 @@ func failure() {
 }
 
 func scrapeLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(config.IntervalMS) * time.Millisecond)
+	intervalMS, err := strconv.Atoi(os.Getenv("INTERVAL_MS"))
+	if err != nil {
+		log.Fatalf("Error parsing INTERVAL_MS: %v", err)
+	}
+
+	ticker := time.NewTicker(time.Duration(intervalMS) * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -179,7 +171,6 @@ func scrapeLoop(ctx context.Context) {
 
 func main() {
 	log.Println("Polling for da tikz...")
-	loadConfig()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
