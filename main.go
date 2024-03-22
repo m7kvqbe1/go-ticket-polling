@@ -19,15 +19,11 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var (
-	httpClient = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Ignore SSL errors
-		},
-	}
-	wg   sync.WaitGroup
-	done = make(chan struct{})
-)
+type Scraper struct {
+	httpClient *http.Client
+	waitGroup  sync.WaitGroup
+	done       chan struct{}
+}
 
 func init() {
 	if err := godotenv.Load(); err != nil {
@@ -35,9 +31,9 @@ func init() {
 	}
 }
 
-func sendText(number string) {
-	wg.Add(1)
-	defer wg.Done()
+func (s *Scraper) sendText(number string) {
+	s.waitGroup.Add(1)
+	defer s.waitGroup.Done()
 
 	key := os.Getenv("SMS_KEY")
 	message := "BUY DI TIKITZ!!!"
@@ -64,7 +60,7 @@ func sendText(number string) {
 
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		log.Println("Error sending SMS:", err)
 		return
@@ -79,7 +75,7 @@ func sendText(number string) {
 	}
 }
 
-func fetch(ctx context.Context) {
+func (s *Scraper) fetch(ctx context.Context) {
 	c := colly.NewCollector(
 		// Spoof user agent to avoid bot detection
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"),
@@ -103,12 +99,12 @@ func fetch(ctx context.Context) {
 
 	c.OnHTML("a[id='buynow']", func(e *colly.HTMLElement) {
 		foundBuynow = true
-		success()
+		s.success()
 	})
 
 	c.OnScraped(func(r *colly.Response) {
 		if !foundBuynow {
-			failure()
+			s.failure()
 		}
 	})
 
@@ -131,22 +127,22 @@ func fetch(ctx context.Context) {
 	}
 }
 
-func success() {
+func (s *Scraper) success() {
 	log.Println("BUY DI TIKITZ!!!")
 
 	phoneNumbers := strings.Split(os.Getenv("PHONE_NUMBERS"), ",")
 	for _, number := range phoneNumbers {
-		go sendText(number)
+		go s.sendText(number)
 	}
 
-	close(done)
+	close(s.done)
 }
 
-func failure() {
+func (s *Scraper) failure() {
 	log.Println("no tikz found...")
 }
 
-func scrapeLoop(ctx context.Context) {
+func (s *Scraper) scrapeLoop(ctx context.Context) {
 	intervalMS, err := strconv.Atoi(os.Getenv("INTERVAL_MS"))
 	if err != nil {
 		log.Fatalf("Error parsing INTERVAL_MS: %v", err)
@@ -160,10 +156,10 @@ func scrapeLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			wg.Add(1)
+			s.waitGroup.Add(1)
 			go func() {
-				defer wg.Done()
-				fetch(ctx)
+				defer s.waitGroup.Done()
+				s.fetch(ctx)
 			}()
 		}
 	}
@@ -172,21 +168,30 @@ func scrapeLoop(ctx context.Context) {
 func main() {
 	log.Println("Polling for da tikz...")
 
+	scraper := &Scraper{
+		httpClient: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		},
+		done: make(chan struct{}),
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-	go scrapeLoop(ctx)
+	go scraper.scrapeLoop(ctx)
 
 	select {
 	case <-signals:
 		log.Println("Received an interrupt, stopping service...")
-	case <-done:
+	case <-scraper.done:
 		log.Println("Success! Terminating gracefully...")
 	}
 
-	wg.Wait()
+	scraper.waitGroup.Wait()
 	log.Println("Shutting down gracefully")
 }
