@@ -108,10 +108,7 @@ func (s *Scraper) fetch() {
 		log.Printf("Error fetching %s: %v\n", r.Request.URL, err)
 	})
 
-	err := c.Visit(os.Getenv("URL"))
-	if err != nil {
-		log.Println("Error visiting:", err)
-	}
+	c.Visit(os.Getenv("URL"))
 }
 
 func (s *Scraper) success() {
