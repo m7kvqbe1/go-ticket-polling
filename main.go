@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"log"
@@ -69,7 +68,10 @@ func (s *Scraper) sendText(number string) {
 	}
 }
 
-func (s *Scraper) fetch(ctx context.Context) {
+func (s *Scraper) fetch() {
+	s.waitGroup.Add(1)
+	defer s.waitGroup.Done()
+
 	c := colly.NewCollector(
 		// Spoof user agent to avoid bot detection
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"),
@@ -106,18 +108,9 @@ func (s *Scraper) fetch(ctx context.Context) {
 		log.Printf("Error fetching %s: %v\n", r.Request.URL, err)
 	})
 
-	if err := ctx.Err(); err != nil {
-		log.Println("Operation canceled:", err)
-		return
-	}
-
 	err := c.Visit(os.Getenv("URL"))
 	if err != nil {
 		log.Println("Error visiting:", err)
-	}
-
-	if err := ctx.Err(); err != nil {
-		log.Println("Operation canceled after visit:", err)
 	}
 }
 
@@ -136,7 +129,7 @@ func (s *Scraper) failure() {
 	log.Println("no tikz found...")
 }
 
-func (s *Scraper) scrapeLoop(ctx context.Context) {
+func (s *Scraper) scrapeLoop() {
 	intervalMS, err := strconv.Atoi(os.Getenv("INTERVAL_MS"))
 	if err != nil {
 		log.Fatalf("Error parsing INTERVAL_MS: %v", err)
@@ -147,14 +140,10 @@ func (s *Scraper) scrapeLoop(ctx context.Context) {
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-s.done:
 			return
 		case <-ticker.C:
-			s.waitGroup.Add(1)
-			go func() {
-				defer s.waitGroup.Done()
-				s.fetch(ctx)
-			}()
+			go s.fetch()
 		}
 	}
 }
@@ -177,13 +166,10 @@ func main() {
 		done: make(chan struct{}),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-	go scraper.scrapeLoop(ctx)
+	go scraper.scrapeLoop()
 
 	select {
 	case <-signals:
