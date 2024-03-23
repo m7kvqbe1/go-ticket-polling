@@ -25,12 +25,6 @@ type Scraper struct {
 	done       chan struct{}
 }
 
-func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-}
-
 func (s *Scraper) sendText(number string) {
 	s.waitGroup.Add(1)
 	defer s.waitGroup.Done()
@@ -162,6 +156,12 @@ func (s *Scraper) scrapeLoop(ctx context.Context) {
 				s.fetch(ctx)
 			}()
 		}
+	}
+}
+
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 }
 
